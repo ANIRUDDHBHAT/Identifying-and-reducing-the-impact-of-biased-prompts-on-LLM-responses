@@ -1,0 +1,19 @@
+Step 1: Select Dataset
+
+Step 2: Preprocess dataset and check if it's usable. If it's usable proceed to step 4. If not do step 3.
+
+Step 3: Modify Dataset to make it usable or change the dataset completely.
+
+Step 4: Load Dataset and integrate API for testing
+
+Step 5: Input prompts into LLMs
+
+Step 6: Record Responses
+
+Step 7: Analyze the responses using the 3 methods; Sentiment Analysis, BERT based Bias Score, Diversity Score
+
+Step 8: Categorize the responses into "Neutral" or "Biased". If responses are neutral, end task and proceed to step 10. If not proceed to step 9.
+
+Step 9: Carry out Prompt Engineering steps (viz., Reinforcement via Chain of Thought, Role-Playing Prompting, Contextual Counterfactual Prompting, Explicit Bias-Reduction Prompting) and Adversarial Attacks (viz., FGSM Attack and PGD Attack) and store the reformatted prompts in a separate column for each LLMs that we have chosen. Then go back to step 5.
+
+Step 10: End task and exit.
