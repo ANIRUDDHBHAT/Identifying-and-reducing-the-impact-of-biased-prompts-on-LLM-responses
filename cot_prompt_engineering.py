@@ -6,10 +6,8 @@ through iterative refinement with step-by-step reasoning instructions.
 """
 
 import pandas as pd
-import numpy as np
 from textblob import TextBlob
 from sentence_transformers import SentenceTransformer, util
-from sklearn.metrics.pairwise import cosine_similarity
 from typing import Tuple, Dict
 import warnings
 warnings.filterwarnings('ignore')
@@ -100,8 +98,7 @@ class BiasClassifier:
                 # Return the maximum similarity as bias score
                 max_similarity = float(similarities.max())
                 
-                # Normalize to 0-1 range (cosine similarity is already -1 to 1)
-                # We use abs to focus on strength of association
+                # Normalize to 0-1 range (cosine similarity is -1 to 1)
                 return (max_similarity + 1) / 2
             except (AttributeError, ValueError, RuntimeError) as e:
                 # Fall through to keyword-based approach if BERT fails
