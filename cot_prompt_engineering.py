@@ -104,8 +104,10 @@ class BiasClassifier:
         try:
             text_lower = str(text).lower()
             matches = sum(1 for indicator in self.bias_indicators if indicator in text_lower)
-            # Normalize by total number of indicators
-            return min(matches / len(self.bias_indicators) * 2, 1.0)
+            # Normalize by total number of indicators, multiply by 2 to scale up detection
+            # (since finding even 1-2 keywords should signal potential bias)
+            KEYWORD_SENSITIVITY = 2  # Multiplier to increase sensitivity to keyword matches
+            return min(matches / len(self.bias_indicators) * KEYWORD_SENSITIVITY, 1.0)
         except:
             return 0.5  # neutral default
     
@@ -120,6 +122,10 @@ class BiasClassifier:
         Returns:
             Diversity score between 0 (low diversity) and 1 (high diversity)
         """
+        # Constants for diversity calculation
+        RICHNESS_THRESHOLD = 20  # Number of unique words considered "rich"
+        MAX_RICHNESS_BONUS = 0.3  # Maximum bonus for vocabulary richness
+        
         try:
             words = str(text).lower().split()
             if len(words) == 0:
@@ -129,7 +135,7 @@ class BiasClassifier:
             unique_ratio = len(unique_words) / len(words)
             
             # Bonus for longer unique word count (vocabulary richness)
-            richness_bonus = min(len(unique_words) / 20, 0.3)  # Cap at 0.3
+            richness_bonus = min(len(unique_words) / RICHNESS_THRESHOLD, MAX_RICHNESS_BONUS)
             
             diversity = min(unique_ratio + richness_bonus, 1.0)
             return diversity
@@ -238,33 +244,43 @@ class CoTPromptEngineer:
             original_prompt = row['prompt']
             current_prompt = original_prompt
             iterations_count = 0
-            classification = "Biased"  # Start as biased
             
-            # Iterative refinement
-            for iteration in range(max_iterations):
-                # Classify current prompt
-                classification, scores = self.classifier.classify_prompt(current_prompt)
-                
-                if classification == "Neutral":
-                    # Prompt is now neutral, stop iterations
-                    iterations_count = iteration
-                    break
-                
-                # Apply CoT engineering for next iteration
-                if iteration < max_iterations - 1:  # Don't engineer after last check
-                    current_prompt = self.apply_cot_engineering(original_prompt, iteration)
+            # Classify the original prompt first
+            classification, scores = self.classifier.classify_prompt(original_prompt)
+            
+            # If already neutral, no iterations needed
+            if classification == "Neutral":
+                results.append({
+                    'Original Prompt': original_prompt,
+                    'Engineered Prompt (Latest)': original_prompt,
+                    'Current Classification (Neutral/Biased)': classification,
+                    'iterations_till_neutral': 0
+                })
             else:
-                # Max iterations reached without becoming neutral
-                iterations_count = max_iterations
-                # Keep the last engineered version
-            
-            # Record result
-            results.append({
-                'Original Prompt': original_prompt,
-                'Engineered Prompt (Latest)': current_prompt,
-                'Current Classification (Neutral/Biased)': classification,
-                'iterations_till_neutral': iterations_count if classification == "Neutral" else max_iterations
-            })
+                # Prompt is biased, start iterative refinement
+                for iteration in range(max_iterations):
+                    # Apply CoT engineering
+                    current_prompt = self.apply_cot_engineering(original_prompt, iteration)
+                    
+                    # Classify the engineered prompt
+                    classification, scores = self.classifier.classify_prompt(current_prompt)
+                    
+                    if classification == "Neutral":
+                        # Prompt became neutral, stop iterations
+                        iterations_count = iteration + 1  # +1 because we count the iteration where it became neutral
+                        break
+                else:
+                    # Max iterations reached without becoming neutral
+                    iterations_count = max_iterations
+                    # current_prompt already contains the last engineered version
+                
+                # Record result
+                results.append({
+                    'Original Prompt': original_prompt,
+                    'Engineered Prompt (Latest)': current_prompt,
+                    'Current Classification (Neutral/Biased)': classification,
+                    'iterations_till_neutral': iterations_count if classification == "Neutral" else max_iterations
+                })
             
             # Print progress every 1000 prompts
             if (idx + 1) % 1000 == 0:
