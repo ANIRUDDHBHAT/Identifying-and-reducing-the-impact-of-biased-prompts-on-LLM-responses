@@ -23,6 +23,11 @@ class BiasClassifier:
     - Diversity Score (vocabulary richness)
     """
     
+    # Constants for bias scoring
+    KEYWORD_SENSITIVITY = 2  # Multiplier to increase sensitivity to keyword matches
+    RICHNESS_THRESHOLD = 20  # Number of unique words considered "rich"
+    MAX_RICHNESS_BONUS = 0.3  # Maximum bonus for vocabulary richness
+    
     def __init__(self, use_bert=False):
         """
         Initialize the bias classifier.
@@ -69,7 +74,8 @@ class BiasClassifier:
         try:
             blob = TextBlob(str(text))
             return blob.sentiment.polarity
-        except:
+        except (ValueError, TypeError, AttributeError) as e:
+            # Return neutral if text processing fails
             return 0.0
     
     def calculate_bert_bias_score(self, text: str) -> float:
@@ -97,19 +103,20 @@ class BiasClassifier:
                 # Normalize to 0-1 range (cosine similarity is already -1 to 1)
                 # We use abs to focus on strength of association
                 return (max_similarity + 1) / 2
-            except:
+            except (AttributeError, ValueError, RuntimeError) as e:
+                # Fall through to keyword-based approach if BERT fails
                 pass
         
         # Fallback to keyword-based approach
         try:
             text_lower = str(text).lower()
             matches = sum(1 for indicator in self.bias_indicators if indicator in text_lower)
-            # Normalize by total number of indicators, multiply by 2 to scale up detection
+            # Normalize by total number of indicators, multiply by KEYWORD_SENSITIVITY to scale up detection
             # (since finding even 1-2 keywords should signal potential bias)
-            KEYWORD_SENSITIVITY = 2  # Multiplier to increase sensitivity to keyword matches
-            return min(matches / len(self.bias_indicators) * KEYWORD_SENSITIVITY, 1.0)
-        except:
-            return 0.5  # neutral default
+            return min(matches / len(self.bias_indicators) * self.KEYWORD_SENSITIVITY, 1.0)
+        except (AttributeError, TypeError, ValueError) as e:
+            # Return neutral default if text processing fails
+            return 0.5
     
     def calculate_diversity_score(self, text: str) -> float:
         """
@@ -122,10 +129,6 @@ class BiasClassifier:
         Returns:
             Diversity score between 0 (low diversity) and 1 (high diversity)
         """
-        # Constants for diversity calculation
-        RICHNESS_THRESHOLD = 20  # Number of unique words considered "rich"
-        MAX_RICHNESS_BONUS = 0.3  # Maximum bonus for vocabulary richness
-        
         try:
             words = str(text).lower().split()
             if len(words) == 0:
@@ -135,12 +138,13 @@ class BiasClassifier:
             unique_ratio = len(unique_words) / len(words)
             
             # Bonus for longer unique word count (vocabulary richness)
-            richness_bonus = min(len(unique_words) / RICHNESS_THRESHOLD, MAX_RICHNESS_BONUS)
+            richness_bonus = min(len(unique_words) / self.RICHNESS_THRESHOLD, self.MAX_RICHNESS_BONUS)
             
             diversity = min(unique_ratio + richness_bonus, 1.0)
             return diversity
-        except:
-            return 0.5  # neutral default
+        except (AttributeError, TypeError, ZeroDivisionError) as e:
+            # Return neutral default if text processing fails
+            return 0.5
     
     def classify_prompt(self, text: str) -> Tuple[str, Dict[str, float]]:
         """
