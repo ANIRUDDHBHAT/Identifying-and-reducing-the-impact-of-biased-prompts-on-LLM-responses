@@ -141,7 +141,7 @@ class BiasClassifier:
         Classify a prompt as Biased or Neutral based on multiple scores.
         
         Classification logic:
-        - Biased if: BERT bias score > 0.4 OR abs(sentiment) > 0.4 OR diversity < 0.4
+        - Biased if: BERT bias score > 0.1 OR abs(sentiment) > 0.4 OR diversity < 0.4
                     OR contains bias indicator keywords
         - Neutral otherwise
         
@@ -198,6 +198,10 @@ class CoTPromptEngineer:
     def apply_cot_engineering(self, prompt: str, iteration: int) -> str:
         """
         Apply CoT engineering by prepending a reasoning instruction.
+        
+        Note: We apply CoT templates to the original prompt each time (not cumulative)
+        to avoid overly complex prompts. Each iteration uses a different template
+        to provide varied reasoning approaches.
         
         Args:
             prompt: Original prompt text
